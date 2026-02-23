@@ -14,96 +14,89 @@ try:
 except:
     all_data = {}
 
-# التوقيت الزمني للحصص
+# التوقيت الزمني للحصص (مطابق للمدرسة)
 SCHEDULE_TIMES = [
+    {"name": "الطابور", "start": "07:10", "end": "07:25"},
     {"name": "الأولى", "start": "07:25", "end": "08:05"},
     {"name": "الثانية", "start": "08:10", "end": "08:50"},
     {"name": "الثالثة", "start": "08:55", "end": "09:35"},
     {"name": "الرابعة", "start": "09:40", "end": "10:20"},
+    {"name": "الفسحة", "start": "10:20", "end": "10:45"},
     {"name": "الخامسة", "start": "10:45", "end": "11:25"},
     {"name": "السادسة", "start": "11:30", "end": "12:10"},
     {"name": "السابعة", "start": "12:15", "end": "12:55"},
     {"name": "الثامنة", "start": "13:00", "end": "13:40"},
 ]
 
-# CSS مخصص
+# ضبط المنطقة الزمنية لسلطنة عمان (UTC+4)
+timezone_offset = datetime.timezone(datetime.timedelta(hours=4))
+now_local = datetime.datetime.now(timezone_offset)
+
+# CSS مخصص لتحسين الألوان والوضوح
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&family=Tajawal:wght@400;700&display=swap');
     
     html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
-        font-family: 'Cairo', 'Tajawal', Tahoma, sans-serif;
+        font-family: 'Cairo', 'Tajawal', sans-serif;
         direction: rtl;
         text-align: right;
         background: radial-gradient(circle, #1a4da1 0%, #0b1a32 100%) !important;
         color: white !important;
     }
 
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
+    #MainMenu, footer, header {visibility: hidden;}
 
-    .stTabs [data-baseweb="tab-list"] {
-        background-color: #0b1a32;
-        border: 2px solid white;
-        margin-bottom: 10px;
-        padding: 5px;
-    }
-
-    .stTabs [data-baseweb="tab"] {
-        color: white !important;
-        font-weight: bold;
-    }
-
-    .stTabs [aria-selected="true"] {
-        background-color: #1a4da1 !important;
-    }
-
-    /* تنسيق جداول الفصول الحية */
+    /* جداول الفصول الحية */
     .live-grade-table {
         width: 100%;
         background-color: white;
         border-collapse: collapse;
-        margin-bottom: 5px;
+        margin-bottom: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
 
     .live-grade-table td {
         border: 2px solid #1a4da1;
-        padding: 8px;
+        padding: 10px;
         font-weight: bold;
         text-align: center;
-        font-size: 1rem;
     }
 
     .class-name-cell {
         background-color: #1a4da1;
         color: white !important;
         width: 40%;
+        font-size: 1.1rem;
     }
 
+    /* تغيير لون الخط للأزرق الواضح بدلاً من الأسود */
     .teacher-live-cell {
         background-color: white;
-        color: #1a4da1 !important;
+        color: #0066cc !important; 
+        font-size: 1rem;
     }
 
     .ticker-footer {
         background-color: #1a4da1;
-        border: 1px solid white;
-        padding: 8px;
+        border: 2px solid white;
+        padding: 10px;
         position: fixed;
         bottom: 5px;
         left: 10px;
         right: 10px;
         overflow: hidden;
         white-space: nowrap;
+        z-index: 1000;
     }
 
     .ticker-text {
         display: inline-block;
         padding-left: 100%;
-        animation: marquee 30s linear infinite;
+        animation: marquee 35s linear infinite;
         color: white;
         font-weight: bold;
+        font-size: 1.2rem;
     }
 
     @keyframes marquee {
@@ -113,8 +106,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# الرأس مع التوقيت
-st.components.v1.html(f"""
+# الرأس مع التوقيت (يستخدم وقت المتصفح للعرض)
+st.components.v1.html("""
     <div style="display: flex; justify-content: space-between; align-items: center; background-color: #0b1a32; padding: 10px 15px; border: 2px solid white; color: white; font-family: 'Cairo', sans-serif; direction: rtl;">
         <div style="background-color: #1a4da1; border: 2px solid white; padding: 5px 25px; font-size: 1.5rem; font-weight: bold;" id="current-day"></div>
         <div style="display: flex; justify-content: space-between; align-items: center; flex-grow: 1; margin: 0 20px;">
@@ -124,45 +117,46 @@ st.components.v1.html(f"""
         </div>
     </div>
     <script>
-        function updateClock() {{
+        function updateClock() {
             const now = new Date();
             const days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
             document.getElementById('current-day').innerText = days[now.getDay()];
             document.getElementById('live-clock').innerText = now.toLocaleTimeString('en-GB');
             const d = now.getDate(); const m = now.getMonth() + 1; const y = now.getFullYear();
             document.getElementById('gregorian-date').innerText = d + "-" + m + "-" + y;
-        }}
+        }
         setInterval(updateClock, 1000);
         updateClock();
     </script>
     """, height=100)
 
-tab1, tab2, tab3 = st.tabs(["اللوحة العامة", "جداول الفصول الحالية", "المناوبة"])
-
-# دالة لتحديد الحصة الحالية
-def get_current_session():
-    now = datetime.datetime.now()
+# تحديد الحصة واليوم برمجياً في بايثون (باستخدام توقيت عمان)
+def get_current_session_info():
+    now = datetime.datetime.now(timezone_offset)
     current_time = now.strftime("%H:%M")
     for session in SCHEDULE_TIMES:
         if session["start"] <= current_time < session["end"]:
             return session["name"]
     return None
 
-current_session_name = get_current_session()
+current_session_name = get_current_session_info()
 days_map = {0: "الإثنين", 1: "الثلاثاء", 2: "الأربعاء", 3: "الخميس", 6: "الأحد"}
-current_day_name = days_map.get(datetime.datetime.now().weekday(), "الأحد")
+current_day_name = days_map.get(now_local.weekday(), "الأحد")
+
+tab1, tab2, tab3 = st.tabs(["اللوحة العامة", "جداول الفصول الحالية", "المناوبة"])
 
 with tab1:
     col_right, col_center, col_left = st.columns([1, 1.2, 1])
     with col_right:
-        st.markdown('<div style="background-color:#1a4da1; padding:8px; text-align:center; font-weight:bold; border:2px solid white;">برنامج اليوم الدراسي</div>', unsafe_allow_html=True)
+        st.markdown('<div style="background-color:#1a4da1; padding:8px; text-align:center; font-weight:bold; border:2px solid white; border-bottom:none;">برنامج اليوم الدراسي</div>', unsafe_allow_html=True)
         st.markdown("""
-            <table style="width:100%; border-collapse:collapse; color:white; border:1px solid white; text-align:center;">
+            <table style="width:100%; border-collapse:collapse; color:white; border:1px solid white; text-align:center; font-size:0.9rem;">
                 <tr style="background-color:#1a4da1;"><th>الحصة</th><th>من</th><th>إلى</th></tr>
                 <tr><td>الأولى</td><td>07:25</td><td>08:05</td></tr>
                 <tr><td>الثانية</td><td>08:10</td><td>08:50</td></tr>
                 <tr><td>الثالثة</td><td>08:55</td><td>09:35</td></tr>
                 <tr><td>الرابعة</td><td>09:40</td><td>10:20</td></tr>
+                <tr style="background-color:rgba(255,255,255,0.1);"><td>الفسحة</td><td>10:20</td><td>10:45</td></tr>
                 <tr><td>الخامسة</td><td>10:45</td><td>11:25</td></tr>
                 <tr><td>السادسة</td><td>11:30</td><td>12:10</td></tr>
                 <tr><td>السابعة</td><td>12:15</td><td>12:55</td></tr>
@@ -171,100 +165,98 @@ with tab1:
         """, unsafe_allow_html=True)
         
     with col_center:
+        # العداد التفاعلي (يستخدم وقت المتصفح للمزامنة)
         st.components.v1.html("""
             <div style="text-align: center; color: white; font-family: 'Cairo', sans-serif; direction: rtl;">
                 <div style="border: 3px solid white; background-color: #1a4da1; padding: 10px; border-radius: 8px; margin-bottom: 20px;">
                     <div style="font-size: 1.2rem;">الحصة الحالية</div>
-                    <div style="font-size: 2.5rem; font-weight: bold;" id="session-name">...</div>
+                    <div style="font-size: 2.5rem; font-weight: bold;" id="session-name-js">...</div>
                 </div>
                 <div style="position: relative; width: 180px; height: 180px; margin: 0 auto;">
                     <svg viewBox="0 0 100 100" style="transform: rotate(-90deg); width: 100%; height: 100%;">
                         <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="8"></circle>
-                        <circle id="timer-progress" cx="50" cy="50" r="45" fill="none" stroke="white" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="283"></circle>
+                        <circle id="progress-js" cx="50" cy="50" r="45" fill="none" stroke="white" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="283"></circle>
                     </svg>
                     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(0deg);">
-                        <div style="font-size: 3.5rem; font-weight: bold;" id="timer-mins">00</div>
+                        <div style="font-size: 3.5rem; font-weight: bold;" id="timer-js">00</div>
                         <div style="font-size: 1.1rem; font-weight: bold;">دقيقة</div>
                     </div>
                 </div>
-                <div style="margin-top: 25px; line-height: 1.6;">
-                    <p>مدير المدرسة الأستاذ: <b>هيثم بن حمد الغافري</b></p>
-                    <p>المدير المساعد الأستاذ: <b>توفيق بن سعيد اليعقوبي</b></p>
-                </div>
             </div>
             <script>
-                const sessions = [
-                    {n:"الأولى", s:"07:25", e:"08:05"}, {n:"الثانية", s:"08:10", e:"08:50"},
-                    {n:"الثالثة", s:"08:55", e:"09:35"}, {n:"الرابعة", s:"09:40", e:"10:20"},
+                const sch = [
+                    {n:"الطابور", s:"07:10", e:"07:25"}, {n:"الأولى", s:"07:25", e:"08:05"},
+                    {n:"الثانية", s:"08:10", e:"08:50"}, {n:"الثالثة", s:"08:55", e:"09:35"},
+                    {n:"الرابعة", s:"09:40", e:"10:20"}, {n:"الفسحة", s:"10:20", e:"10:45"},
                     {n:"الخامسة", s:"10:45", e:"11:25"}, {n:"السادسة", s:"11:30", e:"12:10"},
                     {n:"السابعة", s:"12:15", e:"12:55"}, {n:"الثامنة", s:"13:00", e:"13:40"}
                 ];
                 function update() {
                     const now = new Date();
                     const cur = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
-                    let active = sessions.find(s => cur >= s.s && cur < s.e);
+                    let active = sch.find(s => cur >= s.s && cur < s.e);
                     if(active) {
-                        document.getElementById('session-name').innerText = active.n;
+                        document.getElementById('session-name-js').innerText = active.n;
                         const [eh, em] = active.e.split(':').map(Number);
                         const endD = new Date(); endD.setHours(eh, em, 0);
-                        document.getElementById('timer-mins').innerText = Math.ceil((endD - now)/60000);
+                        document.getElementById('timer-js').innerText = Math.ceil((endD - now)/60000);
                         const [sh, sm] = active.s.split(':').map(Number);
                         const startD = new Date(); startD.setHours(sh, sm, 0);
                         const offset = 283 - ((now - startD)/(endD - startD) * 283);
-                        document.getElementById('timer-progress').style.strokeDashoffset = offset;
+                        document.getElementById('progress-js').style.strokeDashoffset = offset;
                     } else {
-                        document.getElementById('session-name').innerText = "استراحة / خارج الدوام";
-                        document.getElementById('timer-mins').innerText = "00";
+                        document.getElementById('session-name-js').innerText = "استراحة / خارج الدوام";
+                        document.getElementById('timer-js').innerText = "00";
                     }
                 }
                 setInterval(update, 1000); update();
             </script>
-        """, height=400)
+        """, height=350)
+        st.markdown(f'<div style="text-align:center; font-weight:bold; line-height:1.8;">مدير المدرسة الأستاذ: هيثم بن حمد الغافري<br>المدير المساعد الأستاذ: توفيق بن سعيد اليعقوبي</div>', unsafe_allow_html=True)
         
     with col_left:
         st.markdown("""
             <div style="background-color:rgba(26, 77, 161, 0.2); border:2px solid white; padding:15px; margin-bottom:10px; text-align:center;">
                 <h3 style="color:#b8d000; margin:0;">رؤية المدرسة</h3>
-                <p>نحو مدرسةٍ رائدةٍ بأداءٍ متميزٍ وشراكةٍ مجتمعيةٍ فاعلةٍ</p>
+                <p style="font-weight:bold;">نحو مدرسةٍ رائدةٍ بأداءٍ متميزٍ وشراكةٍ مجتمعيةٍ فاعلةٍ</p>
             </div>
             <div style="background-color:rgba(26, 77, 161, 0.2); border:2px solid white; padding:15px; text-align:center;">
                 <h3 style="color:#b8d000; margin:0;">رسالة المدرسة</h3>
                 <p style="font-size:0.85rem;">نسعى إلى توفير بيئة تعليمية محفزة تحقق التميز في الأداء التعليمي...</p>
             </div>
         """, unsafe_allow_html=True)
-        if st.button("الجدول العام للمعلمين"):
+        if st.button("الجدول العام للمعلمين", use_container_width=True):
             st.image("جدول.png")
 
 with tab2:
-    st.markdown(f'<h3 style="text-align:center; color:#b8d000;">جداول الفصول - حصة {current_session_name if current_session_name else "---"}</h3>', unsafe_allow_html=True)
+    st.markdown(f'<h3 style="text-align:center; color:#b8d000; margin-bottom:20px;">حصص المعلمين - {current_day_name} | الحصة {current_session_name if current_session_name else "---"}</h3>', unsafe_allow_html=True)
     
     if all_data and current_day_name in all_data:
         day_data = all_data[current_day_name]
         cols = st.columns(4)
         for i, row in enumerate(day_data):
             with cols[i % 4]:
-                # جلب المعلم للحصة الحالية
-                current_teacher = row.get(current_session_name, "---") if current_session_name else "---"
+                teacher_info = row.get(current_session_name, "---") if current_session_name else "---"
                 st.markdown(f"""
                     <table class="live-grade-table">
                         <tr>
-                            <td class="class-name-cell">الصف {row["الصف"]}</td>
-                            <td class="teacher-live-cell">{current_teacher}</td>
+                            <td class="class-name-cell">{row["الصف"]}</td>
+                            <td class="teacher-live-cell">{teacher_info}</td>
                         </tr>
                     </table>
                 """, unsafe_allow_html=True)
     else:
-        st.warning("لا توجد حصص في الوقت الحالي أو اليوم هو عطلة.")
+        st.warning(f"لا توجد بيانات ليوم {current_day_name} أو اليوم عطلة.")
 
 with tab3:
     st.markdown("""
-        <div style="display:flex; gap:10px;">
+        <div style="display:flex; gap:10px; direction:rtl;">
             <div style="flex:2; border:2px solid white; padding:10px;">
-                <table style="width:100%; text-align:center; border-collapse:collapse; background-color:white; color:#1a4da1;">
+                <table style="width:100%; text-align:center; border-collapse:collapse; background-color:white;">
                     <tr style="background-color:#b8d000; color:black;">
                         <th>جناح الخامس</th><th>جناح السادس</th><th>جناح السابع</th><th>جناح الثامن</th>
                     </tr>
-                    <tr><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                    <tr style="color:#1a4da1; font-weight:bold;"><td>-</td><td>-</td><td>-</td><td>-</td></tr>
                 </table>
             </div>
             <div style="flex:1; background-color:#1a4da1; border:2px solid white; padding:15px; text-align:center;">
@@ -281,6 +273,6 @@ st.markdown("""
     </div></div>
     """, unsafe_allow_html=True)
 
-# إعادة تحميل الصفحة كل دقيقة لتحديث الحصة الحالية برمجياً
+# إعادة التشغيل كل دقيقة لمزامنة الحصة الحالية
 time.sleep(60)
 st.rerun()
