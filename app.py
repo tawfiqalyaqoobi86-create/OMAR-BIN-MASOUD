@@ -14,19 +14,21 @@ try:
 except:
     all_data = {}
 
-# جدول التوقيت الدراسي (تنسيق 24 ساعة للمقارنة الدقيقة)
+# جدول التوقيت الدراسي
 SCHEDULE_TIMES = [
+    {"name": "الطابور", "start": "07:10", "end": "07:25"},
     {"name": "الأولى", "start": "07:25", "end": "08:05"},
     {"name": "الثانية", "start": "08:10", "end": "08:50"},
     {"name": "الثالثة", "start": "08:55", "end": "09:35"},
     {"name": "الرابعة", "start": "09:40", "end": "10:20"},
+    {"name": "الفسحة", "start": "10:20", "end": "10:45"},
     {"name": "الخامسة", "start": "10:45", "end": "11:25"},
     {"name": "السادسة", "start": "11:30", "end": "12:10"},
     {"name": "السابعة", "start": "12:15", "end": "12:55"},
     {"name": "الثامنة", "start": "13:00", "end": "13:40"},
 ]
 
-# CSS مخصص لإصلاح كافة عيوب التنسيق
+# CSS مخصص
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&family=Tajawal:wght@400;700&display=swap');
@@ -41,10 +43,9 @@ st.markdown("""
 
     #MainMenu, footer, header {visibility: hidden;}
 
-    /* بطاقة الفصل المدمجة */
     .class-card {
         display: flex;
-        flex-direction: row-reverse; /* لجعل رقم الصف على اليمين */
+        flex-direction: row-reverse;
         border: 2px solid white;
         margin-bottom: 10px;
         background-color: white;
@@ -79,16 +80,6 @@ st.markdown("""
         padding: 0 5px;
     }
 
-    /* شريط التبويبات */
-    .stTabs [data-baseweb="tab-list"] {
-        background-color: #0b1a32;
-        border: 2px solid white;
-        padding: 5px;
-    }
-    .stTabs [data-baseweb="tab"] { color: white !important; font-weight: bold; }
-    .stTabs [aria-selected="true"] { background-color: #1a4da1 !important; }
-
-    /* التذييل المتحرك المصلح */
     .ticker-container {
         position: fixed;
         bottom: 0;
@@ -178,24 +169,60 @@ with tab1:
             </table>
         """, unsafe_allow_html=True)
     with col2:
-        st.components.v1.html(f"""
+        # العداد التفاعلي المصلح
+        st.components.v1.html("""
             <div style="text-align: center; color: white; font-family: 'Cairo', sans-serif; direction: rtl;">
                 <div style="border: 3px solid white; background-color: #1a4da1; padding: 10px; border-radius: 8px; margin-bottom: 20px;">
                     <div style="font-size: 1.2rem;">الحصة الحالية</div>
-                    <div style="font-size: 2.5rem; font-weight: bold;">{current_session if current_session else "فترة استراحة"}</div>
+                    <div style="font-size: 2.5rem; font-weight: bold;" id="sess-display">فترة استراحة</div>
                 </div>
                 <div style="position: relative; width: 180px; height: 180px; margin: 0 auto;">
                     <svg viewBox="0 0 100 100" style="transform: rotate(-90deg); width: 100%; height: 100%;">
                         <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="8"></circle>
-                        <circle cx="50" cy="50" r="45" fill="none" stroke="white" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="100"></circle>
+                        <circle id="p-bar" cx="50" cy="50" r="45" fill="none" stroke="white" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="283" style="transition: stroke-dashoffset 1s linear;"></circle>
                     </svg>
                     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(0deg); text-align: center;">
-                        <div style="font-size: 3.5rem; font-weight: bold;">12</div>
+                        <div style="font-size: 3.5rem; font-weight: bold;" id="t-display">00</div>
                         <div style="font-size: 1.1rem;">دقيقة</div>
                     </div>
                 </div>
                 <div style="margin-top:20px; font-weight:bold;">هيثم الغافري | توفيق اليعقوبي</div>
             </div>
+            <script>
+                const sch = [
+                    {n:"الطابور", s:"07:10", e:"07:25"}, {n:"الأولى", s:"07:25", e:"08:05"},
+                    {n:"الثانية", s:"08:10", e:"08:50"}, {n:"الثالثة", s:"08:55", e:"09:35"},
+                    {n:"الرابعة", s:"09:40", e:"10:20"}, {n:"الفسحة", s:"10:20", e:"10:45"},
+                    {n:"الخامسة", s:"10:45", e:"11:25"}, {n:"السادسة", s:"11:30", e:"12:10"},
+                    {n:"السابعة", s:"12:15", e:"12:55"}, {n:"الثامنة", s:"13:00", e:"13:40"}
+                ];
+                function updateTimer() {
+                    const now = new Date();
+                    const cur = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
+                    let active = sch.find(s => cur >= s.s && cur < s.e);
+                    
+                    if(active) {
+                        document.getElementById('sess-display').innerText = active.n;
+                        const [eh, em] = active.e.split(':').map(Number);
+                        const ed = new Date(); ed.setHours(eh, em, 0);
+                        const diffMins = Math.ceil((ed - now)/60000);
+                        document.getElementById('t-display').innerText = diffMins > 0 ? diffMins : "00";
+                        
+                        // تحديث الدائرة
+                        const [sh, sm] = active.s.split(':').map(Number);
+                        const sd = new Date(); sd.setHours(sh, sm, 0);
+                        const total = ed - sd;
+                        const elapsed = now - sd;
+                        const offset = 283 - (elapsed / total * 283);
+                        document.getElementById('p-bar').style.strokeDashoffset = Math.max(0, Math.min(283, offset));
+                    } else {
+                        document.getElementById('sess-display').innerText = "فترة استراحة";
+                        document.getElementById('t-display').innerText = "00";
+                        document.getElementById('p-bar').style.strokeDashoffset = 283;
+                    }
+                }
+                setInterval(updateTimer, 1000); updateTimer();
+            </script>
         """, height=380)
     with col3:
         st.markdown('<div style="background-color:rgba(26, 77, 161, 0.3); border:2px solid white; padding:15px; text-align:center;">رؤية المدرسة : نحو مدرسةٍ رائدةٍ بأداءٍ متميزٍ</div>', unsafe_allow_html=True)
@@ -210,7 +237,6 @@ with tab2:
         cols = st.columns(4)
         for i, row in enumerate(day_rows):
             with cols[i % 4]:
-                # جلب المعلم إذا كنا في وقت حصة
                 teacher = row.get(current_session, "") if current_session else ""
                 st.markdown(f"""
                     <div class="class-card">
@@ -221,7 +247,6 @@ with tab2:
     else:
         st.warning("لا توجد بيانات متاحة لهذا اليوم.")
 
-# تذييل الصفحة المصلح تماماً
 st.markdown("""
     <div class="ticker-container">
         <div class="ticker-wrap">
@@ -232,6 +257,5 @@ st.markdown("""
     </div>
     """, unsafe_allow_html=True)
 
-# التحديث التلقائي
 time.sleep(30)
 st.rerun()
